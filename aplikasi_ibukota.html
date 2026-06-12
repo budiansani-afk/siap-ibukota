@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <title>SIAP-IBUKOTA | Sistem Informasi Administrasi Pertanahan Lokasi Ibukota Kabupaten Bima</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'ibukota-oranye': '#e67e22',
+                        'ibukota-kuning': '#f1c40f',
+                        'ibukota-abu': '#95a5a6',
+                        'ibukota-biru': '#2980b9',
+                        'ibukota-hijau': '#27ae60',
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+    <style>
+        /* Gaya untuk cetak / PDF */
+        @media print {
+            body * { visibility: hidden; }
+            #laporanPreview, #laporanPreview * { visibility: visible; }
+            #laporanPreview { position: absolute; top: 0; left: 0; width: 100%; margin: 0; padding: 1rem; box-sizing: border-box; }
+            .no-print { display: none !important; }
+            .laporan-table { width: 100%; border-collapse: collapse; font-size: 8pt; table-layout: fixed; margin-top: 1rem; }
+            .laporan-table th, .laporan-table td { border: 1px solid #000; padding: 4px 4px; text-align: left; vertical-align: top; word-wrap: break-word; line-height: 1; }
+            .laporan-table th { background-color: #e67e22 !important; color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            h2.laporan-judul { font-size: 12pt; font-weight: bold; text-align: center; margin-bottom: 1rem; visibility: visible; margin-top: 0; }
+            @page { size: auto; margin: 2rem; }
+        }
+        /* Gaya layar */
+        body { background: linear-gradient(135deg, #f4f6f7 0%, #e5e8e8 100%); font-family: 'Inter', system-ui, sans-serif; color: #2c3e50; min-height: 100vh; }
+        .card-ibukota { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px); border-radius: 2rem; border: 1px solid rgba(41, 128, 185, 0.2); box-shadow: 0 8px 20px rgba(0,0,0,0.08); transition: transform 0.2s; }
+        .card-ibukota:hover { transform: translateY(-3px); }
+        .brand-wrapper { display: flex; align-items: center; gap: 0.75rem; }
+        .logo-icon { width: 48px; height: 48px; background: #e67e22; border-radius: 16px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .logo-icon img { width: 100%; height: 100%; object-fit: cover; }
+        .main-title { font-size: 1.5rem; font-weight: 800; color: #e67e22; letter-spacing: -0.5px; }
+        .main-title span { color: #c0392b; }
+        .subtitle-line { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.3px; color: #2980b9; text-transform: uppercase; }
+        .nav-btn { transition: all 0.2s; transform: scale(1); background: rgba(255,255,255,0.9); border-radius: 0.75rem; padding: 0.5rem 1rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.5rem; color: #2c3e50; }
+        .nav-btn:hover { transform: scale(1.03); background: #e67e22 !important; color: white; }
+        .nav-btn.active { background: #e67e22 !important; color: white; }
+        @media (max-width: 768px) {
+            .nav-btn span { display: none; }
+            .nav-btn { padding: 0.65rem; gap: 0; min-width: 48px; justify-content: center; }
+            .nav-btn i { font-size: 1.3rem; }
+        }
+        .form-btn { padding: 0.5rem 1.2rem; border-radius: 0.75rem; font-weight: 600; transition: all 0.2s; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; }
+        .form-btn-save { background-color: #27ae60; color: white; }
+        .rekap-scroll { max-height: 65vh; overflow: auto; border-radius: 1.5rem; }
+        #rekap table { min-width: 1100px; width: 100%; border-collapse: collapse; }
+        #rekap th, #rekap td { padding: 0.75rem; vertical-align: top; border-bottom: 1px solid #e0e0e0; }
+        #rekap th { background: #e67e22; color: white; position: sticky; top: 0; }
+        .photo-thumb { width: 60px; height: 60px; object-fit: cover; border-radius: 12px; margin: 4px; border: 2px solid #3498db; cursor: pointer; }
+        .camera-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); z-index: 2000; display: flex; align-items: center; justify-content: center; visibility: hidden; opacity: 0; transition: 0.2s; }
+        .camera-modal.active { visibility: visible; opacity: 1; }
+        .camera-modal-content { background: white; border-radius: 2rem; width: 90%; max-width: 500px; padding: 1.5rem; }
+        #modalVideo { width: 100%; max-height: 300px; object-fit: cover; border-radius: 1rem; transform: scaleX(-1); }
+        .log-table-wrapper { overflow-x: auto; max-height: 60vh; border-radius: 1rem; }
+        .status-badge { padding: 0.2rem 0.7rem; border-radius: 999px; font-size: 0.75rem; font-weight: bold; display: inline-block; }
+        .status-sudah { background: #2ecc71; color: white; }
+        .status-proses { background: #f39c12; color: white; }
+        .status-belum { background: #e74c3c; color: white; }
+        #map { height: 450px; border-radius: 1rem; }
+        .detail-grid { display: grid; grid-template-columns: auto 1fr; gap: 0.75rem 1rem; align-items: baseline; }
+        .info-desa { background: #ecf0f1; border-radius: 1rem; padding: 0.5rem 1rem; font-size: 0.85rem; font-weight: 600; color: #2980b9; }
+        .highlight-row { background-color: #fdebd0; }
+        .chart-container { height: auto; position: static; width: 100%; margin-bottom: 1rem; display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 200px; }
+        .stat-card { transition: all 0.2s; cursor: pointer; }
+        .stat-card:hover { transform: scale(1.02); background: #fff5e6; }
+        .map-legend { background: rgba(255,255,255,0.9); padding: 0.5rem 1rem; border-radius: 0.75rem; margin-bottom: 0.5rem; display: inline-flex; gap: 1rem; font-size: 0.8rem; flex-wrap: wrap; }
+        .laporan-table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 1rem; }
+        .laporan-table th, .laporan-table td { border: 1px solid #ddd; padding: 6px 6px; text-align: left; vertical-align: top; word-wrap: break-word; word-break: break-word; line-height: 1; }
+        .laporan-table th { background-color: #e67e22; color: white; font-weight: bold; }
+        .laporan-table th:nth-child(1) { width: 50px; }
+        .laporan-table th:nth-child(2) { width: 18%; }
+        .laporan-table th:nth-child(3) { width: auto; }
+        .laporan-table th:nth-child(4) { width: 8; }
+        .laporan-table th:nth-child(5) { width: 100px; }
+        .laporan-table th:nth-child(6) { width: auto; }
+        .laporan-table th:nth-child(7) { width: 8%; }
+        .laporan-table th:nth-child(8) { width: 100px; }
+        .laporan-table th:nth-child(9) { width: 10%; }
+        .laporan-table th:nth-child(10) { width: 9%; }
+        .laporan-judul { font-size: 1.2rem; font-weight: bold; text-align: center; margin-bottom: 1rem; color: #2c3e50; margin-top: 0; }
+        @media (max-width: 768px) { .laporan-table { font-size: 11px; } .laporan-table th, .laporan-table td { padding: 4px 3px; } }
+    </style>
+</head>
+<body>
+<!-- Login Overlay -->
+<div id="loginOverlay" style="position: fixed; top:0; left:0; width:100%; height:100%; background: linear-gradient(135deg, #fef9e7 0%, #eaf2f8 100%); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+    <div class="login-card" style="background: rgba(255, 255, 255, 0.95); border-radius: 2rem; padding: 2rem 1.5rem; width: 90%; max-width: 420px; text-align: center; box-shadow: 0 25px 45px rgba(0,0,0,0.1); backdrop-filter: blur(8px); border: 1px solid rgba(230, 126, 34, 0.3);">
+        <div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
+            <img src="https://res.cloudinary.com/de4prnqa4/image/upload/v1781219486/srvr6pitg62qpijtra31.jpg" alt="Logo SIAP-IBUKOTA" style="width: 100px; height: 100px; object-fit: cover; border-radius: 28px; border: 3px solid #e67e22;">
+        </div>
+        <h1 style="font-size: 1.8rem; font-weight: 800; color: #e67e22;">SIAP-IBUKOTA</h1>
+        <p style="font-size: 0.9rem; font-weight: 800; color: #2980b9; text-transform: uppercase;">SISTEM INFORMASI ADMINISTRASI PERTANAHAN</p>
+        <p style="font-size: 0.9rem; font-weight: 800; color: #2980b9; text-transform: uppercase;">LOKASI IBUKOTA KABUPATEN BIMA</p>
+        <p style="font-size: 0.85rem; font-weight: 600; color: #7f8c8d; margin-bottom: 1rem;">Desa Dadibou, Kecamatan Woha</p>
+        <p style="font-size: 0.7rem; font-style: italic; margin-bottom: 1.5rem;">"Manajemen Sertipikasi Tanah Lokasi Ibukota Kabupaten Bima"</p>
+        <form id="loginForm" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+                <label style="display: block; font-weight: 600;">Nama Pengguna:</label>
+                <input type="text" id="loginNama" required placeholder="Masukkan nama Anda" style="width:100%; padding: 0.75rem; border-radius: 1rem; border: 1px solid #dcdde1;">
+            </div>
+            <button type="submit" style="background-color: #27ae60; color: white; font-weight: bold; padding: 0.75rem; border-radius: 1rem; border: none; cursor: pointer;"><i class="fas fa-sign-in-alt"></i> Masuk</button>
+        </form>
+        <p style="font-size: 0.6rem; color: #95a5a6; margin-top: 1.5rem;">Manajemen Sertipikasi Tanah Lokasi Ibukota Kabupaten Bima</p>
+    </div>
+</div>
+
+<!-- Main App -->
+<div id="appContent" style="display: none;">
+    <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-ibukota-oranye shadow-sm">
+        <div class="w-full px-4 py-2 flex flex-wrap items-center justify-between gap-3">
+            <div class="brand-wrapper"><div class="logo-icon"><img src="https://res.cloudinary.com/de4prnqa4/image/upload/v1781219486/srvr6pitg62qpijtra31.jpg" alt="Logo"></div><div><div class="main-title">SIAP<span>-IBUKOTA</span></div><div class="subtitle-line">SISTEM INFORMASI ADMINISTRASI PERTANAHAN</div><div class="subtitle-line">LOKASI IBUKOTA KABUPATEN BIMA</div></div></div>
+            <div class="flex gap-2 flex-wrap">
+                <button data-page="beranda" class="nav-btn"><i class="fas fa-chart-line"></i><span>Beranda</span></button>
+                <button data-page="master" class="nav-btn"><i class="fas fa-database"></i><span>Kelola</span></button>
+                <button data-page="rekap" class="nav-btn"><i class="fas fa-table-list"></i><span>Rekapan</span></button>
+                <button data-page="peta" class="nav-btn"><i class="fas fa-map"></i><span>Peta</span></button>
+                <button data-page="laporan" class="nav-btn"><i class="fas fa-file-alt"></i><span>Laporan</span></button>
+                <button data-page="log" class="nav-btn"><i class="fas fa-history"></i><span>Log</span></button>
+            </div>
+            <div class="flex items-center gap-3"><span class="text-sm font-semibold text-white bg-ibukota-biru px-3 py-1 rounded-full"><i class="fas fa-user mr-1"></i> <span id="currentUserName">-</span></span><button id="logoutBtn" class="bg-ibukota-oranye hover:bg-orange-600 text-white px-4 py-2 rounded-xl text-sm font-semibold"><i class="fas fa-sign-out-alt mr-1"></i> Keluar</button></div>
+        </div>
+    </nav>
+    <main class="w-full px-4 md:px-6 py-6 max-w-[1600px] mx-auto pb-8 space-y-6">
+        <div class="info-desa text-center md:text-left"><i class="fas fa-map-marker-alt mr-2 text-ibukota-oranye"></i> <strong>Lokasi:</strong> Desa Dadibou, Kecamatan Woha, Kabupaten Bima</div>
+
+<!-- BERANDA INFORMATIF -->
+<div id="beranda" class="page-section space-y-6">
+    <!-- Statistik Utama + Progres -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4" id="statsContainer"></div>
+<!-- Informasi Total Luas Tanah -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="card-ibukota p-4 text-center bg-green-50 border-l-4 border-green-500">
+        <div class="text-sm font-bold text-green-700 uppercase">✅ Total Luas Selesai (Sertipikat Terbit)</div>
+        <div class="text-3xl font-extrabold text-green-600" id="totalLuasSelesai">0 m²</div>
+    </div>
+    <div class="card-ibukota p-4 text-center bg-red-50 border-l-4 border-red-500">
+        <div class="text-sm font-bold text-red-700 uppercase">⏳ Total Luas Belum Selesai (Proses + Belum Daftar)</div>
+        <div class="text-3xl font-extrabold text-red-600" id="totalLuasBelumSelesai">0 m²</div>
+    </div>
+</div>
+    <!-- Ringkasan Progres & Peringatan -->
+    <div class="grid md:grid-cols-2 gap-4">
+        <div class="card-ibukota p-4">
+            <h3 class="text-sm font-bold mb-2 text-ibukota-hijau flex items-center gap-2">
+                <i class="fas fa-chart-simple"></i> Capaian Sertipikat
+            </h3>
+            <div id="progresRingkasan" class="text-center text-2xl font-bold"></div>
+            <div class="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                <div id="progresBar" class="bg-ibukota-hijau h-2.5 rounded-full" style="width:0%"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">dari total bidang tanah</p>
+        </div>
+        <div class="card-ibukota p-4">
+            <h3 class="text-sm font-bold mb-2 text-ibukota-oranye flex items-center gap-2">
+                <i class="fas fa-triangle-exclamation"></i> Peringatan Data
+            </h3>
+            <div id="warningList" class="text-sm space-y-1 max-h-24 overflow-y-auto"></div>
+        </div>
+    </div>
+
+    <!-- Grafik -->
+    <div class="grid md:grid-cols-2 gap-6">
+        <div class="card-ibukota p-4">
+            <h3 class="text-sm font-bold mb-2 text-ibukota-oranye text-center">📊 Status Sertipikasi</h3>
+            <div class="chart-container"><canvas id="statusChart"></canvas></div>
+        </div>
+        <div class="card-ibukota p-4">
+            <h3 class="text-sm font-bold mb-2 text-ibukota-biru text-center">📋 Pengambilan Sertipikat</h3>
+            <div class="chart-container"><canvas id="ambilChart"></canvas></div>
+        </div>
+        <div class="card-ibukota p-4">
+            <h3 class="text-sm font-bold mb-2 text-ibukota-hijau text-center">📐 Luas Tanah per Status (m²)</h3>
+            <div class="chart-container"><canvas id="luasStatusChart"></canvas></div>
+        </div>
+        <div class="card-ibukota p-4">
+            <h3 class="text-sm font-bold mb-2 text-ibukota-oranye text-center">📈 Progres Sertipikasi</h3>
+            <div class="chart-container"><canvas id="progresChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- Tabel 5 Data Terbaru & Top Pengambil -->
+    <div class="grid lg:grid-cols-2 gap-6">
+        <div class="card-ibukota p-4">
+            <h3 class="text-md font-bold text-ibukota-biru mb-3 flex items-center gap-2">
+                <i class="fas fa-clock"></i> 5 Data Tanah Terbaru
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-ibukota-abu/20">
+                        <tr><th class="p-2 text-left">Pemegang Hak</th><th>Status</th><th>Tahun</th></tr>
+                    </thead>
+                    <tbody id="latestDataTable"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="card-ibukota p-4">
+            <h3 class="text-md font-bold text-ibukota-hijau mb-3 flex items-center gap-2">
+                <i class="fas fa-user-check"></i> Top 5 Pengambil Sertipikat
+            </h3>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-ibukota-abu/20">
+                        <tr><th class="p-2 text-left">Nama Pengambil</th><th>Jumlah</th></tr>
+                    </thead>
+                    <tbody id="topPengambilTable"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+        <!-- Kelola -->
+        <div id="master" class="page-section hidden space-y-5">
+            <div class="card-ibukota p-5">
+                <h2 class="text-xl font-bold mb-4 text-ibukota-oranye"><i class="fas fa-edit"></i> Kelola Sertipikasi Tanah Ibukota</h2>
+                <form id="tanahForm" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <input type="hidden" id="editId">
+                    <div><label class="text-xs font-bold">Nama Pemegang Hak *</label><input id="nama" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru" required></div>
+                    <div><label class="text-xs font-bold">Nomor Hak Milik</label><input id="hakMilik" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></div>
+                    <div><label class="text-xs font-bold">NIB (Nomor Induk Bidang)</label><input id="nib" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></div>
+                    <div><label class="text-xs font-bold">Luas Tanah (m²)</label><input id="luas" type="number" step="1" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></div>
+                    <div><label class="text-xs font-bold">Nomor Berkas</label><input id="noBerkas" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></div>
+                    <div><label class="text-xs font-bold">Tahun Daftar</label><input id="tahun" type="number" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></div>
+                    <div><label class="text-xs font-bold">Status</label><select id="statusTanah" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"><option>SUDAH JADI</option><option>PROSES</option><option>BELUM DAFTAR</option></select></div>
+                    <div><label class="text-xs font-bold">Pengambil Sertipikat</label><input id="pengambil" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></div>
+                    <div><label class="text-xs font-bold">Latitude</label><input id="latitude" type="number" step="any" placeholder="-8.5042" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></div>
+                    <div><label class="text-xs font-bold">Longitude</label><input id="longitude" type="number" step="any" placeholder="118.7078" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></div>
+                    <div class="md:col-span-2"><label class="text-xs font-bold">Catatan</label><textarea id="catatan" rows="2" class="w-full p-2 rounded-xl bg-white/70 border border-ibukota-biru"></textarea></div>
+                    <div class="md:col-span-2 border-t pt-3">
+                        <div class="flex flex-wrap justify-between items-center gap-4">
+                            <div class="flex gap-2">
+                                <button type="button" id="btnUploadMultiple" class="bg-ibukota-hijau hover:bg-green-600 text-white px-4 py-2 rounded-xl text-sm shadow"><i class="fas fa-cloud-upload-alt"></i> Unggah Foto</button>
+                                <button type="button" id="btnOpenCameraModal" class="bg-ibukota-biru hover:bg-blue-600 text-white px-4 py-2 rounded-xl text-sm shadow"><i class="fas fa-camera"></i> Kamera</button>
+                            </div>
+                            <div class="flex gap-3">
+                                <button type="submit" class="form-btn form-btn-save"><i class="fas fa-save"></i> Simpan Data</button>
+                                <button type="button" id="cancelFormBtn" class="form-btn bg-gray-200 hover:bg-gray-300 hidden"><i class="fas fa-times"></i> Batal</button>
+                                <button type="button" id="resetFormBtn" class="form-btn bg-yellow-200 hover:bg-yellow-300"><i class="fas fa-eraser"></i> Reset</button>
+                            </div>
+                        </div>
+                        <div id="multiPreview" class="flex flex-wrap gap-2 mt-3"></div>
+                        <input type="hidden" id="existingPhotoUrls" value="[]">
+                        <input type="file" id="uploadFileInput" multiple accept="image/*" class="hidden">
+                    </div>
+                </form>
+            </div>
+            <div class="card-ibukota p-4 flex flex-wrap gap-3 justify-between">
+                <div class="flex gap-2"><button id="exportExcelBtn" class="bg-ibukota-hijau hover:bg-green-600 text-white px-4 py-2 rounded-xl shadow text-sm"><i class="fas fa-file-excel"></i> Ekspor Excel</button><button id="importExcelTrigger" class="bg-ibukota-oranye hover:bg-orange-500 text-white px-4 py-2 rounded-xl shadow text-sm"><i class="fas fa-upload"></i> Impor Excel Data Ibukota</button><input type="file" id="importExcelFile" accept=".xlsx" class="hidden"></div>
+                <button id="importSeedDataBtn" class="bg-ibukota-abu hover:bg-gray-600 text-white px-4 py-2 rounded-xl text-sm shadow"><i class="fas fa-database"></i> Seeder Data Tanah Ibukota</button>
+            </div>
+        </div>
+
+        <!-- Rekap -->
+        <div id="rekap" class="page-section hidden space-y-4">
+            <div class="flex gap-2"><button id="toggleFilterBtn" class="bg-ibukota-biru text-white px-4 py-2 rounded-xl text-sm"><i class="fas fa-filter"></i> Filter</button><button id="resetFilterBtn" class="bg-ibukota-oranye text-white px-4 py-2 rounded-xl text-sm"><i class="fas fa-undo"></i> Reset</button></div>
+            <div id="filterPanel" class="hidden card-ibukota p-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <select id="filterStatusRekap"><option value="">Semua Status</option><option>SUDAH JADI</option><option>PROSES</option><option>BELUM DAFTAR</option></select>
+                <input id="filterTahun" type="number" placeholder="Tahun Daftar">
+                <input id="filterUniversal" placeholder="Cari Nama / Hak Milik / NIB / Berkas / Catatan" class="p-2 rounded-xl bg-white/70 border border-ibukota-biru">
+            </div>
+            <div class="card-ibukota overflow-x-auto"><div class="rekap-scroll"><table class="w-full text-sm"><thead class="bg-ibukota-oranye"><tr><th class="p-2">No</th><th>Pemegang Hak</th><th>Hak Milik</th><th>NIB</th><th>Luas (m²)</th><th>Berkas</th><th>Tahun</th><th>Status</th><th>Pengambil</th><th>Catatan</th><th>Foto</th><th>Aksi</th></tr></thead><tbody id="rekapBody"></tbody></table></div></div>
+        </div>
+
+        <!-- Peta -->
+        <div id="peta" class="page-section hidden">
+            <div class="card-ibukota p-2">
+                <div class="map-legend">
+                    <span><i class="fas fa-circle" style="color: #27ae60;"></i> Sertipikat Terbit</span>
+                    <span><i class="fas fa-circle" style="color: #f39c12;"></i> Dalam Proses</span>
+                    <span><i class="fas fa-circle" style="color: #e74c3c;"></i> Belum Sertipikat</span>
+                </div>
+                <div id="map" class="h-[450px] rounded-xl"></div>
+            </div>
+        </div>
+
+        <!-- Laporan -->
+        <div id="laporan" class="page-section hidden">
+            <div class="card-ibukota p-4 space-y-4">
+                <h2 class="text-xl font-bold text-ibukota-oranye">Laporan Pertanahan Ibukota</h2>
+                <div class="flex flex-wrap gap-3 items-end no-print">
+                    <div>
+                        <label class="text-sm font-bold">Filter Status:</label>
+                        <select id="laporanStatusFilter" class="p-2 rounded-xl border border-ibukota-biru">
+                            <option value="">Semua Status</option>
+                            <option value="SUDAH JADI">SUDAH JADI (Sertipikat Terbit)</option>
+                            <option value="PROSES">PROSES</option>
+                            <option value="BELUM DAFTAR">BELUM DAFTAR</option>
+                        </select>
+                    </div>
+                    <button id="btnTampilkanLaporan" class="bg-ibukota-biru text-white px-4 py-2 rounded-xl shadow"><i class="fas fa-eye"></i> Tampilkan Laporan</button>
+                    <button id="btnCetakLaporan" class="bg-ibukota-oranye text-white px-4 py-2 rounded-xl shadow"><i class="fas fa-print"></i> Cetak / Export PDF</button>
+                    <button id="btnExportLaporanExcel" class="bg-ibukota-hijau text-white px-4 py-2 rounded-xl shadow"><i class="fas fa-file-excel"></i> Ekspor Laporan Excel</button>
+                </div>
+                <div id="laporanPreview" class="overflow-x-auto border rounded-xl p-2 bg-white">
+                    <p class="text-gray-500 text-center p-4">Silakan pilih filter dan klik "Tampilkan Laporan".</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log -->
+        <div id="log" class="page-section hidden">
+            <div class="card-ibukota p-4">
+                <div class="flex flex-wrap gap-2 mb-4 items-center">
+                    <input type="date" id="logDateFrom" class="p-2 rounded-xl border"><input type="date" id="logDateTo" class="p-2 rounded-xl border">
+                    <select id="logTypeFilter"><option value="">Semua Aksi</option><option>TAMBAH</option><option>EDIT</option><option>HAPUS</option><option>LOGIN</option><option>LOGOUT</option></select>
+                    <div id="logAdminPanel" style="display: none;" class="flex gap-2 ml-auto"><button id="deleteSelectedLogsBtn" class="bg-ibukota-oranye text-white px-3 py-2 rounded-xl">Hapus Terpilih</button><button id="deleteAllLogsBtn" class="bg-ibukota-abu text-white px-3 py-2 rounded-xl">Hapus Semua</button></div>
+                </div>
+                <div class="log-table-wrapper"><table class="log-table w-full"><thead class="bg-ibukota-biru"><tr><th class="p-2 w-10"><input type="checkbox" id="selectAllLogs"></th><th>Waktu</th><th>Pengguna</th><th>Aksi</th><th>Detail</th></tr></thead><tbody id="logTable"></tbody></table></div>
+            </div>
+        </div>
+    </main>
+    <footer class="w-full text-center py-4 text-xs text-stone-500 border-t border-ibukota-oranye bg-white/30">SIAP-IBUKOTA © 2026 - Sistem Informasi Administrasi Pertanahan Lokasi Ibukota Kabupaten Bima - Pemerintah Kabupaten Bima</footer>
+</div>
+
+<!-- Camera Modal -->
+<div id="cameraModal" class="camera-modal"><div class="camera-modal-content"><h3 class="text-lg font-bold mb-3">Ambil Foto Sertipikat</h3><video id="modalVideo" autoplay playsinline muted></video><canvas id="modalCanvas" class="hidden"></canvas><img id="modalPreview" class="modal-preview-img hidden"><div class="flex gap-2 justify-center mt-4"><button id="modalCaptureBtn" class="bg-ibukota-hijau text-white px-3 py-1 rounded-lg">Ambil</button><button id="modalRetakeBtn" class="hidden bg-yellow-200 px-3 py-1 rounded-lg">Ulang</button><button id="modalSaveBtn" class="hidden bg-blue-300 px-3 py-1 rounded-lg">Simpan</button><button id="modalCloseBtn" class="bg-gray-300 px-3 py-1 rounded-lg">Tutup</button></div></div></div>
+<div id="detailModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm hidden" onclick="if(event.target===this) closeDetailModal()"><div class="bg-white rounded-2xl max-w-2xl w-full mx-4"><div class="bg-gradient-to-r from-ibukota-oranye to-ibukota-kuning p-4 flex justify-between"><h3 class="text-xl font-bold text-white">Detail Tanah Ibukota</h3><button id="closeModalBtn" class="text-2xl text-white">&times;</button></div><div id="detailModalBody" class="p-5 max-h-[70vh] overflow-y-auto"></div></div></div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, onSnapshot, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    
+    const firebaseConfig = {
+        apiKey: "AIzaSyDxeGYTWxy-aeLEmDsWUn4oEDf4-bO80_g",
+        authDomain: "aplikasi-huntap.firebaseapp.com",
+        databaseURL: "https://aplikasi-huntap-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "aplikasi-huntap",
+        storageBucket: "aplikasi-huntap.firebasestorage.app",
+        messagingSenderId: "913800740835",
+        appId: "1:913800740835:web:bac4d117b63b4239a4aad6",
+        measurementId: "G-0NZSF3MM56"
+    };
+    
+    let app, db;
+    try {
+        app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        window.db = db;
+        console.log("Firebase initialized successfully");
+    } catch(e) {
+        console.error("Firebase initialization error:", e);
+        alert("Gagal menginisialisasi Firebase: " + e.message);
+    }
+    
+    const CLOUDINARY_CLOUD_NAME = "de4prnqa4";
+    const CLOUDINARY_UPLOAD_PRESET = "ibukota";
+    const CLOUDINARY_API_KEY = "522531551358338";
+    const CLOUDINARY_API_SECRET = "17j1h0HMoBTG8LUpX3k7gnjDuH0";
+    const DESA_TETAP = "Dadibou";
+    
+    let tanahRef, logRef;
+    if (db) {
+        tanahRef = collection(db, "data_tanah_ibukota");
+        logRef = collection(db, "log_aktivitas_ibukota");
+    }
+    
+    // Helper functions
+    async function logDetail(aksi, detail) {
+        if (!logRef) return;
+        try {
+            await addDoc(logRef, { waktu: new Date().toISOString(), pengguna: currentUser, aksi, detail });
+        } catch(e) { console.warn("Log error:", e); }
+    }
+    
+    async function uploadToCloudinary(file) {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+        try {
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`, { method: "POST", body: fd });
+            if (!res.ok) throw new Error(`Cloudinary error: ${res.status}`);
+            const data = await res.json();
+            return data.secure_url;
+        } catch (err) {
+            console.error(err);
+            throw new Error("Upload foto gagal. Periksa preset 'ibukota' di Cloudinary.");
+        }
+    }
+    
+    async function deletePhotoFromCloudinary(url) {
+        try {
+            const publicId = url.split('/upload/')[1].split('.')[0];
+            const timestamp = Math.floor(Date.now() / 1000);
+            const signature = CryptoJS.SHA1(`public_id=${publicId}&timestamp=${timestamp}${CLOUDINARY_API_SECRET}`).toString();
+            const fd = new URLSearchParams();
+            fd.append("public_id", publicId);
+            fd.append("api_key", CLOUDINARY_API_KEY);
+            fd.append("timestamp", timestamp);
+            fd.append("signature", signature);
+            await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/destroy`, { method: "POST", body: fd });
+        } catch(e) { console.warn("Gagal hapus dari Cloudinary", e); }
+    }
+    
+    let allData = [], unsubscribeSnapshot, map, markerLayer, currentUser = "";
+    let pendingImageFiles = [], existingPhotoUrls = [], deletedPhotoUrls = [];
+    
+    function refreshCompletePreview() {
+        const container = document.getElementById('multiPreview'); container.innerHTML = '';
+        existingPhotoUrls.forEach((url, idx) => {
+            const wrapper = document.createElement('div'); wrapper.className = "relative inline-block";
+            const img = document.createElement('img'); img.src = url; img.className = "photo-thumb";
+            const removeBtn = document.createElement('button'); removeBtn.innerHTML = "×"; removeBtn.className = "absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs";
+            removeBtn.onclick = () => { deletedPhotoUrls.push(url); existingPhotoUrls.splice(idx, 1); refreshCompletePreview(); };
+            wrapper.appendChild(img); wrapper.appendChild(removeBtn); container.appendChild(wrapper);
+        });
+        pendingImageFiles.forEach((file, idx) => {
+            const url = URL.createObjectURL(file);
+            const wrapper = document.createElement('div'); wrapper.className = "relative inline-block";
+            const img = document.createElement('img'); img.src = url; img.className = "photo-thumb";
+            const removeBtn = document.createElement('button'); removeBtn.innerHTML = "×"; removeBtn.onclick = () => { pendingImageFiles.splice(idx,1); URL.revokeObjectURL(url); refreshCompletePreview(); };
+            wrapper.appendChild(img); wrapper.appendChild(removeBtn); container.appendChild(wrapper);
+        });
+    }
+    function addPendingFile(file) { pendingImageFiles.push(file); refreshCompletePreview(); }
+    async function uploadAllPending() { let urls = []; for(let f of pendingImageFiles) urls.push(await uploadToCloudinary(f)); return urls; }
+    
+    function loadData() {
+        if (!tanahRef) {
+            console.error("Firestore not initialized");
+            Swal.fire("Error", "Database tidak terinisialisasi. Periksa koneksi internet dan konfigurasi Firebase.", "error");
+            return;
+        }
+        try {
+            if (unsubscribeSnapshot) unsubscribeSnapshot();
+            unsubscribeSnapshot = onSnapshot(query(tanahRef, orderBy("createdAt","desc")), 
+                (snap) => {
+                    allData = snap.docs.map(d=>({ id:d.id, ...d.data(), fotoUrls: d.data().fotoUrls || [] }));
+                    renderAll();
+                    renderLog();
+                    console.log("Data loaded, count:", allData.length);
+                },
+                (error) => {
+                    console.error("Firestore error:", error);
+                    Swal.fire("Error Database", error.message, "error");
+                }
+            );
+        } catch(e) {
+            console.error(e);
+            Swal.fire("Error", "Gagal memuat data: " + e.message, "error");
+        }
+    }
+    
+    function renderAll() { 
+        renderBerandaStats(); 
+        renderRekapTable(); 
+        if(map) refreshMapMarkers(); 
+    }
+    
+    // Perbaikan utama: renderBerandaStats dengan penanganan chart
+    function renderBerandaStats() {
+        // Ambil data
+        let total = allData.length;
+        let sertifikatTerbit = allData.filter(d => d.status === "SUDAH JADI").length;
+        let proses = allData.filter(d => d.status === "PROSES").length;
+        let belum = allData.filter(d => d.status === "BELUM DAFTAR").length;
+        let diambil = allData.filter(d => d.yangMengambilSertipikat && d.yangMengambilSertipikat.trim() !== "").length;
+        let totalLuas = allData.reduce((s, d) => s + (parseFloat(d.luasTanah) || 0), 0);
+        let luasSudah = allData.filter(d => d.status === "SUDAH JADI").reduce((s, d) => s + (parseFloat(d.luasTanah) || 0), 0);
+        let luasProses = allData.filter(d => d.status === "PROSES").reduce((s, d) => s + (parseFloat(d.luasTanah) || 0), 0);
+        let luasBelum = allData.filter(d => d.status === "BELUM DAFTAR").reduce((s, d) => s + (parseFloat(d.luasTanah) || 0), 0);
+        
+        // Update statistik card
+        const statsContainer = document.getElementById("statsContainer");
+        if (statsContainer) {
+            statsContainer.innerHTML = `
+                <div class="card-ibukota p-3 text-center stat-card" data-filter="all"><div class="text-3xl font-bold">${total}</div><div>Total Bidang</div></div>
+                <div class="card-ibukota p-3 text-center"><div class="text-3xl font-bold">${totalLuas.toLocaleString()} m²</div><div>Total Luas</div></div>
+                <div class="card-ibukota p-3 text-center stat-card" data-filter="sudah"><div class="text-3xl font-bold text-green-600">${sertifikatTerbit}</div><div>Sertipikat Terbit</div></div>
+                <div class="card-ibukota p-3 text-center stat-card" data-filter="proses"><div class="text-3xl font-bold text-orange-500">${proses}</div><div>Dalam Proses</div></div>
+                <div class="card-ibukota p-3 text-center stat-card" data-filter="belum"><div class="text-3xl font-bold text-red-500">${belum}</div><div>Belum Sertipikat</div></div>
+                <div class="card-ibukota p-3 text-center stat-card" data-filter="diambil"><div class="text-3xl font-bold text-blue-600">${diambil}</div><div>Sudah Diambil</div></div>
+            `;
+        }
+        
+        // Fungsi untuk membuat chart dengan aman
+        function createChart(ctx, type, data, options) {
+            if (!ctx) return null;
+            try {
+                return new Chart(ctx, { type, data, options });
+            } catch(e) {
+                console.error("Chart creation error:", e);
+                return null;
+            }
+        }
+        
+        // Hancurkan chart lama jika ada
+        if (window.statusChartInstance) window.statusChartInstance.destroy();
+        if (window.ambilChartInstance) window.ambilChartInstance.destroy();
+        if (window.luasStatusChartInstance) window.luasStatusChartInstance.destroy();
+        if (window.progresChartInstance) window.progresChartInstance.destroy();
+        
+        // Chart Status Sertipikasi (Doughnut)
+        const statusCtx = document.getElementById("statusChart")?.getContext("2d");
+// ========== STATUS SERTIPIKASI (BAR CHART) ==========
+if (statusCtx) {
+    window.statusChartInstance = createChart(statusCtx, 'bar', {
+        labels: ["Sertipikat Terbit", "Dalam Proses", "Belum Sertipikat"],
+        datasets: [{
+            label: 'Jumlah Bidang Tanah',
+            data: [sertifikatTerbit, proses, belum],
+            backgroundColor: ["#27ae60", "#f39c12", "#e74c3c"],
+            borderRadius: 8,
+            barPercentage: 0.6,
+            categoryPercentage: 0.8
+        }]
+    }, {
+        responsive: true,
+        maintainAspectRatio: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { stepSize: 1, precision: 0 },
+                title: { display: true, text: 'Jumlah Bidang', font: { weight: 'bold' } }
+            },
+            x: {
+                title: { display: true, text: 'Status Sertipikasi', font: { weight: 'bold' } }
+            }
+        },
+        plugins: {
+            tooltip: { callbacks: { label: (ctx) => `${ctx.raw} bidang` } },
+            legend: { position: 'top' }
+        }
+    });
+}        
+        // Chart Pengambilan Sertipikat (Bar)
+        const ambilCtx = document.getElementById("ambilChart")?.getContext("2d");
+        if (ambilCtx) {
+            window.ambilChartInstance = createChart(ambilCtx, 'bar', {
+                labels: ["Sudah Diambil", "Belum Diambil"],
+                datasets: [{ data: [diambil, total - diambil], backgroundColor: "#2980b9" }]
+            }, { responsive: true, maintainAspectRatio: true });
+        }
+        
+        // Chart Luas Tanah per Status (Bar)
+        const luasStatusCtx = document.getElementById("luasStatusChart")?.getContext("2d");
+        if (luasStatusCtx) {
+            window.luasStatusChartInstance = createChart(luasStatusCtx, 'bar', {
+                labels: ["Sertipikat Terbit", "Proses", "Belum"],
+                datasets: [{ label: "Luas (m²)", data: [luasSudah, luasProses, luasBelum], backgroundColor: ["#27ae60", "#f39c12", "#e74c3c"] }]
+            }, { responsive: true, maintainAspectRatio: true, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.raw.toLocaleString()} m²` } } } });
+        }
+        // Hitung total luas berdasarkan status
+let luasSelesai = allData
+    .filter(d => d.status === "SUDAH JADI")
+    .reduce((sum, d) => sum + (parseFloat(d.luasTanah) || 0), 0);
+
+let luasBelumSelesai = allData
+    .filter(d => d.status === "PROSES" || d.status === "BELUM DAFTAR")
+    .reduce((sum, d) => sum + (parseFloat(d.luasTanah) || 0), 0);
+
+// Tampilkan ke elemen yang sudah dibuat
+const elSelesai = document.getElementById("totalLuasSelesai");
+const elBelum = document.getElementById("totalLuasBelumSelesai");
+if (elSelesai) elSelesai.innerText = luasSelesai.toLocaleString() + " m²";
+if (elBelum) elBelum.innerText = luasBelumSelesai.toLocaleString() + " m²";
+        // Chart Progres Sertipikasi (Bar persentase)
+        const progresCtx = document.getElementById("progresChart")?.getContext("2d");
+        if (progresCtx) {
+            const persentase = total ? (sertifikatTerbit / total * 100) : 0;
+            window.progresChartInstance = createChart(progresCtx, 'bar', {
+                labels: ["Persentase Sertipikat Terbit"],
+                datasets: [{ label: "Persentase", data: [persentase], backgroundColor: "#2980b9" }]
+            }, { responsive: true, maintainAspectRatio: true, scales: { y: { max: 100, ticks: { callback: v => v + "%" } } } });
+        }
+    }
+    // Update ringkasan progres
+function updateProgresRingkasan() {
+    const total = allData.length;
+    const sertifikatTerbit = allData.filter(d => d.status === "SUDAH JADI").length;
+    const persen = total ? (sertifikatTerbit / total * 100).toFixed(1) : 0;
+    const progresEl = document.getElementById("progresRingkasan");
+    const progresBar = document.getElementById("progresBar");
+    if (progresEl) progresEl.innerText = `${persen}% (${sertifikatTerbit} / ${total} bidang)`;
+    if (progresBar) progresBar.style.width = `${persen}%`;
+}
+
+// Peringatan data tidak lengkap
+function updateWarnings() {
+    const tanpaKoordinat = allData.filter(d => !d.latitude || !d.longitude).length;
+    const tanpaFoto = allData.filter(d => !d.fotoUrls || d.fotoUrls.length === 0).length;
+    const warningContainer = document.getElementById("warningList");
+    if (!warningContainer) return;
+    let html = '';
+    if (tanpaKoordinat) html += `<p class="text-yellow-700"><i class="fas fa-map-pin"></i> ${tanpaKoordinat} bidang belum punya koordinat peta.</p>`;
+    if (tanpaFoto) html += `<p class="text-orange-600"><i class="fas fa-image"></i> ${tanpaFoto} bidang belum punya foto dokumentasi.</p>`;
+    if (!tanpaKoordinat && !tanpaFoto) html = '<p class="text-green-600"><i class="fas fa-check-circle"></i> Semua data sudah lengkap.</p>';
+    warningContainer.innerHTML = html;
+}
+
+// Tabel 5 data terbaru (berdasarkan createdAt)
+function renderLatestData() {
+    const sorted = [...allData].sort((a,b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0,5);
+    const tbody = document.getElementById("latestDataTable");
+    if (!tbody) return;
+    tbody.innerHTML = sorted.map(item => `
+        <tr class="border-b">
+            <td class="p-2">${escapeHtml(item.namaPemegangHak || '-')}</td>
+            <td class="p-2"><span class="status-badge ${item.status==='SUDAH JADI'?'status-sudah':item.status==='PROSES'?'status-proses':'status-belum'}">${item.status}</span></td>
+            <td class="p-2">${item.tahunDaftar || '-'}</td>
+        </tr>
+    `).join('');
+}
+
+// Top 5 pengambil sertipikat
+function renderTopPengambil() {
+    const counts = {};
+    allData.forEach(d => {
+        if (d.yangMengambilSertipikat && d.yangMengambilSertipikat.trim() !== "") {
+            const nama = d.yangMengambilSertipikat.trim();
+            counts[nama] = (counts[nama] || 0) + 1;
+        }
+    });
+    const sorted = Object.entries(counts).sort((a,b) => b[1] - a[1]).slice(0,5);
+    const tbody = document.getElementById("topPengambilTable");
+    if (!tbody) return;
+    tbody.innerHTML = sorted.map(([nama, jumlah]) => `
+        <tr class="border-b">
+            <td class="p-2">${escapeHtml(nama)}</td>
+            <td class="p-2 font-semibold">${jumlah} sertipikat</td>
+        </tr>
+    `).join('');
+    if (sorted.length === 0) tbody.innerHTML = '<tr><td colspan="2" class="p-2 text-gray-400">Belum ada data pengambil</td></tr>';
+}
+
+// OVERRIDE renderBerandaStats agar tetap memanggil fungsi tambahan
+const originalRenderBerandaStats = renderBerandaStats;
+window.renderBerandaStats = function() {
+    originalRenderBerandaStats();
+    updateProgresRingkasan();
+    updateWarnings();
+    renderLatestData();
+    renderTopPengambil();
+};
+renderBerandaStats = window.renderBerandaStats;
+    function renderRekapTable() {
+        let statusFilter = document.getElementById("filterStatusRekap").value, tahunFilter = document.getElementById("filterTahun").value, search = document.getElementById("filterUniversal").value.toLowerCase();
+        let filtered = allData.filter(d => {
+            if(statusFilter && d.status !== statusFilter) return false;
+            if(tahunFilter && d.tahunDaftar?.toString() !== tahunFilter) return false;
+            if(search) { let fields = [d.namaPemegangHak, d.hakMilikNomor, d.nib, d.noBerkas, d.catatan, d.yangMengambilSertipikat].filter(v=>v); if(!fields.some(f=>f.toString().toLowerCase().includes(search))) return false; }
+            return true;
+        });
+        document.getElementById("rekapBody").innerHTML = filtered.map((item, idx) => `<tr class="border-b hover:bg-amber-50"><td class="p-2">${idx+1}</td><td class="p-2">${escapeHtml(item.namaPemegangHak||'-')}</td><td class="p-2">${item.hakMilikNomor||'-'}</td><td class="p-2">${item.nib||'-'}</td><td class="p-2">${item.luasTanah||'-'}</td><td class="p-2">${item.noBerkas||'-'}</td><td class="p-2">${item.tahunDaftar||'-'}</td><td class="p-2"><span class="status-badge ${item.status==='SUDAH JADI'?'status-sudah':item.status==='PROSES'?'status-proses':'status-belum'}">${item.status}</span></td><td class="p-2">${item.yangMengambilSertipikat||'-'}</td><td class="p-2">${escapeHtml(item.catatan||'-')}</td><td class="p-2">${item.fotoUrls?.length ? `<i class="fas fa-image text-blue-500"></i> ${item.fotoUrls.length}` : '-'}</td><td class="whitespace-nowrap"><button onclick="window.viewDetail('${item.id}')" class="text-blue-500"><i class="fas fa-eye"></i></button> <button onclick="window.editTanah('${item.id}')" class="text-amber-600"><i class="fas fa-edit"></i></button> <button onclick="window.focusMap('${item.id}')" class="text-green-600"><i class="fas fa-map-marker-alt"></i></button> <button onclick="window.hapusTanah('${item.id}')" class="text-red-500"><i class="fas fa-trash"></i></button></td></tr>`).join("");
+    }
+    
+    function escapeHtml(str) { if(!str) return ""; return str.replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m] || m)); }
+    window.viewDetail = (id) => { let item=allData.find(d=>d.id==id); if(item){ let fotoHtml = item.fotoUrls?.length ? `<div class="col-span-2 flex gap-2">${item.fotoUrls.map(url=>`<img src="${url}" class="h-24 w-24 object-cover rounded-xl cursor-pointer" onclick="window.open('${url}')">`).join('')}</div>` : ''; document.getElementById("detailModalBody").innerHTML = `<div class="detail-grid"><div class="font-bold">Nama</div><div>${escapeHtml(item.namaPemegangHak)}</div><div class="font-bold">Hak Milik</div><div>${item.hakMilikNomor||'-'}</div><div class="font-bold">NIB</div><div>${item.nib||'-'}</div><div class="font-bold">Luas</div><div>${item.luasTanah} m²</div><div class="font-bold">Berkas</div><div>${item.noBerkas||'-'}</div><div class="font-bold">Tahun</div><div>${item.tahunDaftar||'-'}</div><div class="font-bold">Status</div><div>${item.status}</div><div class="font-bold">Pengambil</div><div>${item.yangMengambilSertipikat||'-'}</div><div class="font-bold">Catatan</div><div>${escapeHtml(item.catatan||'-')}</div>${fotoHtml}</div>`; document.getElementById("detailModal").classList.remove("hidden"); } };
+    window.editTanah = (id) => { let item=allData.find(d=>d.id==id); if(item){ document.getElementById("editId").value=id; document.getElementById("nama").value=item.namaPemegangHak||""; document.getElementById("hakMilik").value=item.hakMilikNomor||""; document.getElementById("nib").value=item.nib||""; document.getElementById("luas").value=item.luasTanah||""; document.getElementById("noBerkas").value=item.noBerkas||""; document.getElementById("tahun").value=item.tahunDaftar||""; document.getElementById("statusTanah").value=item.status; document.getElementById("pengambil").value=item.yangMengambilSertipikat||""; document.getElementById("catatan").value=item.catatan||""; document.getElementById("latitude").value=item.latitude||""; document.getElementById("longitude").value=item.longitude||""; existingPhotoUrls=[...(item.fotoUrls||[])]; pendingImageFiles=[]; deletedPhotoUrls=[]; refreshCompletePreview(); document.getElementById("cancelFormBtn").classList.remove("hidden"); triggerNav("master"); } };
+    window.hapusTanah = async (id) => { let ok=await Swal.fire({title:"Hapus Data?",text:"Foto akan dihapus permanen",icon:"warning",showCancelButton:true}); if(ok.isConfirmed){ let item=allData.find(d=>d.id==id); if(item.fotoUrls) for(let url of item.fotoUrls) await deletePhotoFromCloudinary(url); await deleteDoc(doc(tanahRef,id)); await logDetail("HAPUS",`Data ${item.namaPemegangHak} dihapus`); Swal.fire("Terhapus"); renderRekapTable(); } };
+    window.focusMap = (id) => { let item=allData.find(d=>d.id==id); if(item && item.latitude && item.longitude){ triggerNav("peta"); setTimeout(()=>{ if(map){ map.flyTo([item.latitude, item.longitude], 18); L.popup().setLatLng([item.latitude, item.longitude]).setContent(`<b>${escapeHtml(item.namaPemegangHak)}</b><br>Status: ${item.status}`).openOn(map); } },500); } else Swal.fire("Info","Koordinat tidak tersedia"); };
+    
+    function initMap() { if(map) return; map = L.map('map').setView([-8.49, 118.72], 13); L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains:['mt0','mt1','mt2','mt3'], attribution: 'Google', maxZoom: 20 }).addTo(map); markerLayer = L.layerGroup().addTo(map); refreshMapMarkers(); }
+    function refreshMapMarkers() { if(!markerLayer) return; markerLayer.clearLayers(); allData.forEach(d => { if(d.latitude && d.longitude) { let color = d.status === "SUDAH JADI" ? "#27ae60" : d.status === "PROSES" ? "#f39c12" : "#e74c3c"; let icon = L.divIcon({ html: `<div style="background:${color}; width:14px; height:14px; border-radius:50%; border:2px solid #fff;"></div>`, iconSize: [14,14] }); L.marker([d.latitude, d.longitude], { icon }).bindPopup(`<b>${escapeHtml(d.namaPemegangHak)}</b><br>Status: ${d.status}`).addTo(markerLayer); } }); }
+    
+    function sanitizeData(obj) {
+        const clean = {};
+        for (const [k, v] of Object.entries(obj)) {
+            if (v === undefined || v === null) continue;
+            if (typeof v === 'number' && isNaN(v)) continue;
+            clean[k] = v;
+        }
+        return clean;
+    }
+    
+    document.getElementById("tanahForm").addEventListener("submit", async (e) => { 
+        e.preventDefault(); 
+        const id = document.getElementById("editId").value; 
+        Swal.fire({title:'Menyimpan...', allowOutsideClick: false, didOpen: () => Swal.showLoading()}); 
+        try { 
+            let newUrls = await uploadAllPending(); 
+            for(let url of deletedPhotoUrls) await deletePhotoFromCloudinary(url); 
+            const allUrls = [...existingPhotoUrls, ...newUrls];
+            const rawData = { 
+                namaPemegangHak: document.getElementById("nama")?.value || "",
+                hakMilikNomor: document.getElementById("hakMilik")?.value || "",
+                nib: document.getElementById("nib")?.value || "",
+                desa: DESA_TETAP,
+                luasTanah: parseFloat(document.getElementById("luas")?.value) || 0,
+                noBerkas: document.getElementById("noBerkas")?.value || "",
+                tahunDaftar: document.getElementById("tahun")?.value || "",
+                status: document.getElementById("statusTanah")?.value || "BELUM DAFTAR",
+                yangMengambilSertipikat: document.getElementById("pengambil")?.value || "",
+                catatan: document.getElementById("catatan")?.value || "",
+                latitude: (() => { let v = document.getElementById("latitude")?.value; return (v !== "" && !isNaN(parseFloat(v))) ? parseFloat(v) : null; })(),
+                longitude: (() => { let v = document.getElementById("longitude")?.value; return (v !== "" && !isNaN(parseFloat(v))) ? parseFloat(v) : null; })(),
+                fotoUrls: allUrls,
+                updatedAt: new Date().toISOString()
+            };
+            const data = sanitizeData(rawData);
+            if(id) { 
+                await updateDoc(doc(tanahRef, id), data); 
+                await logDetail("EDIT", `Update data ${data.namaPemegangHak}`); 
+                Swal.fire("Berhasil","Data diperbarui"); 
+            } else { 
+                await addDoc(tanahRef, {...data, createdAt: new Date().toISOString()}); 
+                await logDetail("TAMBAH", `Tambah data ${data.namaPemegangHak}`); 
+                Swal.fire("Berhasil","Data tersimpan"); 
+            } 
+            resetFormToEmpty(); renderRekapTable(); triggerNav("rekap"); 
+        } catch(err){ console.error(err); Swal.fire("Gagal", err.message || "Terjadi kesalahan", "error"); } 
+    });
+    
+    function resetFormToEmpty() { document.getElementById("tanahForm").reset(); document.getElementById("editId").value=""; existingPhotoUrls=[]; pendingImageFiles=[]; deletedPhotoUrls=[]; refreshCompletePreview(); document.getElementById("cancelFormBtn").classList.add("hidden"); }
+    document.getElementById("resetFormBtn").onclick = resetFormToEmpty; document.getElementById("cancelFormBtn").onclick = () => { resetFormToEmpty(); triggerNav("rekap"); };
+    document.getElementById("btnUploadMultiple").onclick = () => document.getElementById("uploadFileInput").click();
+    document.getElementById("uploadFileInput").onchange = (e) => { Array.from(e.target.files).forEach(f=>addPendingFile(f)); e.target.value=""; };
+    
+    async function importExcelData(file) {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data);
+        const sheet = wb.Sheets["Data Ibukota"];
+        if (!sheet) {
+            Swal.fire("Gagal", "Sheet 'Data Ibukota' tidak ditemukan dalam file Excel.", "error");
+            return;
+        }
+        let rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+        let headerRowIndex = rows.findIndex(row => row && row.some(cell => cell && cell.toString().toUpperCase().includes("NAMA PEMEGANG HAK")));
+        if (headerRowIndex === -1) {
+            Swal.fire("Gagal", "Header 'Nama Pemegang Hak' tidak ditemukan", "error");
+            return;
+        }
+        const header = rows[headerRowIndex];
+        const getColIndex = (keywords) => {
+            return header.findIndex(cell => cell && keywords.some(kw => cell.toString().toUpperCase().includes(kw)));
+        };
+        const idxNama = getColIndex(["NAMA PEMEGANG HAK", "NAMA PEMEGANG"]);
+        const idxHakMilik = getColIndex(["HAK MILIK NOMOR", "HAK MILIK", "NOMOR HAK MILIK"]);
+        const idxNIB = getColIndex(["NIB", "NOMOR INDUK BIDANG"]);
+        const idxLuas = getColIndex(["LUAS TANAH", "LUAS"]);
+        const idxBerkas = getColIndex(["NOMOR BERKAS", "NO BERKAS", "BERKAS"]);
+        const idxTahun = getColIndex(["TAHUN DAFTAR", "TAHUN"]);
+        const idxStatus = getColIndex(["STATUS", "STATUS SERTIPIKAT"]);
+        const idxPengambil = getColIndex(["PENGAMBIL SERTIPIKAT", "PENGAMBIL"]);
+        const idxCatatan = getColIndex(["CATATAN", "KETERANGAN"]);
+        const idxLat = getColIndex(["LATITUDE", "LAT"]);
+        const idxLng = getColIndex(["LONGITUDE", "LONG", "LNG"]);
+
+        let added = 0;
+        for (let i = headerRowIndex + 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row || !row[idxNama]) continue;
+            let nama = row[idxNama]?.toString().trim();
+            if (!nama) continue;
+
+            let hakMilik = idxHakMilik !== -1 ? (row[idxHakMilik]?.toString().trim() || "") : "";
+            let nib = idxNIB !== -1 ? (row[idxNIB]?.toString().trim() || "") : "";
+            let luas = idxLuas !== -1 ? (parseFloat(row[idxLuas]) || 0) : 0;
+            let noBerkas = idxBerkas !== -1 ? (row[idxBerkas]?.toString().trim() || "") : "";
+            let tahun = idxTahun !== -1 ? (row[idxTahun]?.toString().trim() || "") : "";
+let statusRaw = idxStatus !== -1 ? (row[idxStatus]?.toString().trim().toUpperCase() || "") : "";
+let status = "BELUM DAFTAR";
+if (statusRaw.includes("SUDAH") || statusRaw.includes("TERBIT") || statusRaw === "JADI") {
+    status = "SUDAH JADI";
+} else if (statusRaw.includes("PROSES") || statusRaw.includes("PROGRES")) {
+    status = "PROSES";
+} else {
+    status = "BELUM DAFTAR";
+}            
+            let pengambil = idxPengambil !== -1 ? (row[idxPengambil]?.toString().trim() || "") : "";
+            let catatan = idxCatatan !== -1 ? (row[idxCatatan]?.toString().trim() || "") : "";
+            let latitude = idxLat !== -1 ? (parseFloat(row[idxLat]) || null) : null;
+            let longitude = idxLng !== -1 ? (parseFloat(row[idxLng]) || null) : null;
+
+            await addDoc(tanahRef, {
+                namaPemegangHak: nama,
+                hakMilikNomor: hakMilik,
+                nib: nib,
+                desa: DESA_TETAP,
+                luasTanah: luas,
+                noBerkas: noBerkas,
+                tahunDaftar: tahun,
+                status: status,
+                yangMengambilSertipikat: pengambil,
+                catatan: catatan,
+                latitude: latitude,
+                longitude: longitude,
+                fotoUrls: [],
+                createdAt: new Date().toISOString()
+            });
+            added++;
+        }
+        Swal.fire(`Sukses! ${added} data berhasil diimpor.`);
+        renderRekapTable();
+    }
+    
+    document.getElementById("importExcelTrigger").onclick = ()=>document.getElementById("importExcelFile").click();
+    document.getElementById("importExcelFile").onchange = async(e)=>{ if(e.target.files[0]) await importExcelData(e.target.files[0]); e.target.value=""; };
+    document.getElementById("importSeedDataBtn").onclick = ()=>document.getElementById("importExcelTrigger").click();
+    
+    document.getElementById("exportExcelBtn").onclick = () => {
+        if (!allData.length) {
+            Swal.fire("Peringatan", "Tidak ada data untuk diekspor.", "warning");
+            return;
+        }
+        const sheetData = allData.map(d => ({
+            "Nama Pemegang Hak": d.namaPemegangHak || "",
+            "Hak Milik No.": d.hakMilikNomor || "",
+            "NIB": d.nib || "",
+            "Luas (m²)": d.luasTanah || 0,
+            "No Berkas": d.noBerkas || "",
+            "Tahun Daftar": d.tahunDaftar || "",
+            "Status": d.status || "",
+            "Pengambil Sertipikat": d.yangMengambilSertipikat || "",
+            "Catatan": d.catatan || "",
+            "Latitude": d.latitude ?? "",
+            "Longitude": d.longitude ?? ""
+        }));
+        const ws = XLSX.utils.json_to_sheet(sheetData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "DataIbukota");
+        XLSX.writeFile(wb, `Data_Ibukota_${Date.now()}.xlsx`);
+        Swal.fire("Berhasil", "File Excel telah diunduh", "success");
+    };
+    
+    // LAPORAN
+    let currentFilteredData = [];
+    function renderLaporan(filterStatus) {
+        let filtered = allData;
+        if (filterStatus) {
+            filtered = allData.filter(d => d.status === filterStatus);
+        }
+        currentFilteredData = filtered;
+        if (filtered.length === 0) {
+            document.getElementById("laporanPreview").innerHTML = '<p class="text-gray-500 text-center p-4">Tidak ada data untuk status yang dipilih.</p>';
+            return;
+        }
+        let judul = '<h2 class="laporan-judul">DAFTAR REKAPAN SERTIPIKASI TANAH KAWASAN KANTOR IBUKOTA KABUPATEN BIMA</h2>';
+        let html = judul + '<table class="laporan-table">';
+        html += '<thead><tr><th>No</th><th>Nama Pemegang Hak</th><th>Hak Milik</th><th>NIB</th><th>Luas (m²)</th><th>No Berkas</th><th>Tahun</th><th>Status</th><th>Pengambil</th><th>Catatan</th></tr></thead><tbody>';
+        filtered.forEach((item, idx) => {
+            html += `<tr>
+                <td>${idx+1}</td>
+                <td>${escapeHtml(item.namaPemegangHak||'-')}</td>
+                <td>${item.hakMilikNomor||'-'}</td>
+                <td>${item.nib||'-'}</td>
+                <td>${item.luasTanah||0}</td>
+                <td>${item.noBerkas||'-'}</td>
+                <td>${item.tahunDaftar||'-'}</td>
+                <td>${item.status||'-'}</td>
+                <td>${item.yangMengambilSertipikat||'-'}</td>
+                <td>${escapeHtml(item.catatan||'-')}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById("laporanPreview").innerHTML = html;
+    }
+    
+    document.getElementById("btnTampilkanLaporan").onclick = () => {
+        const status = document.getElementById("laporanStatusFilter").value;
+        renderLaporan(status);
+    };
+    document.getElementById("btnCetakLaporan").onclick = () => {
+        if (currentFilteredData.length === 0 && allData.length === 0) {
+            Swal.fire("Info", "Tidak ada data untuk dicetak. Silakan tampilkan laporan terlebih dahulu.", "info");
+            return;
+        }
+        if (currentFilteredData.length === 0 && allData.length > 0) {
+            renderLaporan(document.getElementById("laporanStatusFilter").value);
+        }
+        window.print();
+    };
+    document.getElementById("btnExportLaporanExcel").onclick = () => {
+        if (currentFilteredData.length === 0 && allData.length === 0) {
+            Swal.fire("Peringatan", "Tidak ada data untuk diekspor.", "warning");
+            return;
+        }
+        let dataToExport = currentFilteredData.length ? currentFilteredData : allData;
+        const sheetData = dataToExport.map(d => ({
+            "Nama Pemegang Hak": d.namaPemegangHak || "",
+            "Hak Milik No.": d.hakMilikNomor || "",
+            "NIB": d.nib || "",
+            "Luas (m²)": d.luasTanah || 0,
+            "No Berkas": d.noBerkas || "",
+            "Tahun Daftar": d.tahunDaftar || "",
+            "Status": d.status || "",
+            "Pengambil Sertipikat": d.yangMengambilSertipikat || "",
+            "Catatan": d.catatan || "",
+            "Latitude": d.latitude ?? "",
+            "Longitude": d.longitude ?? ""
+        }));
+        const ws = XLSX.utils.json_to_sheet(sheetData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "LaporanIbukota");
+        XLSX.writeFile(wb, `Laporan_Ibukota_${Date.now()}.xlsx`);
+        Swal.fire("Berhasil", "File Excel laporan telah diunduh", "success");
+    };
+    
+    // LOG ACTIVITIES
+    async function renderLog() { 
+        if (!logRef) return;
+        let snap=await getDocs(query(logRef, orderBy("waktu","desc"))); 
+        let logs=snap.docs.map(d=>({ id:d.id, ...d.data() })); 
+        let from=document.getElementById("logDateFrom").value, to=document.getElementById("logDateTo").value, type=document.getElementById("logTypeFilter").value; 
+        if(from) logs=logs.filter(l=>l.waktu.split("T")[0]>=from); 
+        if(to) logs=logs.filter(l=>l.waktu.split("T")[0]<=to); 
+        if(type) logs=logs.filter(l=>l.aksi===type); 
+        let isAdmin = (currentUser === "Ianz"); 
+        document.getElementById("logAdminPanel").style.display = isAdmin ? "flex" : "none"; 
+        document.getElementById("logTable").innerHTML = logs.map(l => `<tr><td class="p-2 text-center">${isAdmin ? `<input type="checkbox" class="log-checkbox" value="${l.id}">` : ''}</td><td class="p-2">${new Date(l.waktu).toLocaleString()}</td><td class="p-2">${l.pengguna}</td><td class="p-2">${l.aksi}</td><td class="p-2">${l.detail}</td></tr>`).join(""); 
+        if(isAdmin) document.getElementById("selectAllLogs").onclick = (e) => document.querySelectorAll(".log-checkbox").forEach(cb => cb.checked = e.target.checked); 
+    }
+    async function deleteSelectedLogs() { const cbs = document.querySelectorAll(".log-checkbox:checked"); if(cbs.length===0) return Swal.fire("Tidak ada log dipilih"); const confirm = await Swal.fire({ title: `Hapus ${cbs.length} log?`, icon: "warning", showCancelButton: true }); if(!confirm.isConfirmed) return; const batch = writeBatch(db); for(let cb of cbs) batch.delete(doc(logRef, cb.value)); await batch.commit(); Swal.fire("Berhasil"); renderLog(); }
+    async function deleteAllLogs() { const snap = await getDocs(logRef); if(snap.empty) return Swal.fire("Tidak ada log"); const confirm = await Swal.fire({ title: "Hapus SEMUA log?", icon: "warning", showCancelButton: true }); if(!confirm.isConfirmed) return; const batch = writeBatch(db); snap.docs.forEach(d => batch.delete(d.ref)); await batch.commit(); Swal.fire("Berhasil"); renderLog(); }
+    document.getElementById("deleteSelectedLogsBtn")?.addEventListener("click", deleteSelectedLogs); document.getElementById("deleteAllLogsBtn")?.addEventListener("click", deleteAllLogs);
+    
+    function triggerNav(page) { 
+        document.querySelectorAll(".page-section").forEach(s=>s.classList.add("hidden")); 
+        document.getElementById(page).classList.remove("hidden"); 
+        document.querySelectorAll(".nav-btn").forEach(btn=>{ 
+            if(btn.dataset.page===page) btn.classList.add("active"); 
+            else btn.classList.remove("active"); 
+        }); 
+        if(page==="peta") setTimeout(() => { map?.invalidateSize(); refreshMapMarkers(); }, 150); 
+        if(page==="log") renderLog(); 
+        localStorage.setItem("siap_ibukota_page", page); 
+    }
+    document.querySelectorAll(".nav-btn").forEach(btn=>btn.addEventListener("click",()=>triggerNav(btn.dataset.page)));
+    document.getElementById("toggleFilterBtn").onclick = ()=>document.getElementById("filterPanel").classList.toggle("hidden");
+    document.getElementById("resetFilterBtn").onclick = ()=>{ document.getElementById("filterStatusRekap").value=""; document.getElementById("filterTahun").value=""; document.getElementById("filterUniversal").value=""; renderRekapTable(); };
+    ["filterStatusRekap","filterTahun","filterUniversal"].forEach(id=>document.getElementById(id)?.addEventListener("change", renderRekapTable));
+    document.getElementById("closeModalBtn").onclick = ()=>document.getElementById("detailModal").classList.add("hidden");
+    window.closeDetailModal = ()=>document.getElementById("detailModal").classList.add("hidden");
+    
+    // LOGIN
+    const loginOverlay = document.getElementById('loginOverlay');
+    const appContainer = document.getElementById('appContent');
+    
+    async function doLogin(nama) {
+        currentUser = nama;
+        document.getElementById('currentUserName').innerText = currentUser;
+        localStorage.setItem("siap_ibukota_user", nama);
+        loginOverlay.style.display = 'none';
+        appContainer.style.display = 'block';
+        
+        try {
+            loadData();
+            initMap();
+            const savedPage = localStorage.getItem("siap_ibukota_page");
+            triggerNav(savedPage && ["beranda","master","rekap","peta","laporan","log"].includes(savedPage) ? savedPage : "beranda");
+            await logDetail("LOGIN", `Pengguna ${nama} login`);
+        } catch(e) {
+            console.error("Login error:", e);
+            Swal.fire("Error", "Gagal memuat data: " + e.message, "error");
+            loginOverlay.style.display = 'flex';
+            appContainer.style.display = 'none';
+            localStorage.removeItem("siap_ibukota_user");
+            throw e;
+        }
+    }
+    
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const nama = document.getElementById("loginNama").value.trim();
+        if (!nama) {
+            Swal.fire("Perhatian", "Nama wajib diisi", "warning");
+            return;
+        }
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Masuk...';
+        btn.disabled = true;
+        try {
+            await doLogin(nama);
+        } catch(err) {}
+        finally {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+        }
+    });
+    
+    const savedUser = localStorage.getItem("siap_ibukota_user");
+    if (savedUser && db) {
+        doLogin(savedUser).catch(e => console.error("Auto login failed:", e));
+    } else if (!db) {
+        Swal.fire("Error Koneksi", "Tidak dapat terhubung ke database. Periksa koneksi internet dan konfigurasi Firebase.", "error").then(() => {
+            loginOverlay.style.display = 'flex';
+            appContainer.style.display = 'none';
+        });
+    }
+    
+    document.getElementById("logoutBtn").addEventListener("click", async() => { 
+        await logDetail("LOGOUT", `${currentUser} keluar`); 
+        localStorage.removeItem("siap_ibukota_user"); 
+        localStorage.removeItem("siap_ibukota_page"); 
+        appContainer.style.display = 'none'; 
+        loginOverlay.style.display = 'flex'; 
+        if (unsubscribeSnapshot) unsubscribeSnapshot(); 
+        if (map) map.remove(); 
+        map = null; 
+    });
+    
+    document.getElementById("statsContainer")?.addEventListener("click", (e) => { 
+        const card = e.target.closest("[data-filter]"); 
+        if(!card) return; 
+        const filter = card.dataset.filter; 
+        document.getElementById("filterStatusRekap").value=""; 
+        if(filter==="sudah") document.getElementById("filterStatusRekap").value="SUDAH JADI"; 
+        else if(filter==="proses") document.getElementById("filterStatusRekap").value="PROSES"; 
+        else if(filter==="belum") document.getElementById("filterStatusRekap").value="BELUM DAFTAR"; 
+        else if(filter==="all"){ document.getElementById("filterStatusRekap").value=""; document.getElementById("filterUniversal").value=""; } 
+        renderRekapTable(); triggerNav("rekap"); 
+    });
+    
+    // Camera handling
+    let modalStream=null, modalCapturedBlob=null;
+    async function openCameraModal(){ if(modalStream) modalStream.getTracks().forEach(t=>t.stop()); try{ let stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{exact:"environment"}}}); modalStream=stream; document.getElementById("modalVideo").srcObject=stream; document.getElementById("cameraModal").classList.add("active"); }catch{ try{ let stream=await navigator.mediaDevices.getUserMedia({video:true}); modalStream=stream; document.getElementById("modalVideo").srcObject=stream; document.getElementById("cameraModal").classList.add("active"); }catch(e){ Swal.fire("Kamera tidak tersedia"); } } }
+    document.getElementById("btnOpenCameraModal").onclick = openCameraModal;
+    document.getElementById("modalCaptureBtn").onclick = ()=>{ let video=document.getElementById("modalVideo"), canvas=document.getElementById("modalCanvas"), ctx=canvas.getContext("2d"); canvas.width=video.videoWidth; canvas.height=video.videoHeight; ctx.drawImage(video,0,0); canvas.toBlob(blob=>{ modalCapturedBlob=blob; let preview=document.getElementById("modalPreview"); preview.src=URL.createObjectURL(blob); preview.classList.remove("hidden"); video.classList.add("hidden"); document.getElementById("modalCaptureBtn").classList.add("hidden"); document.getElementById("modalRetakeBtn").classList.remove("hidden"); document.getElementById("modalSaveBtn").classList.remove("hidden"); if(modalStream) modalStream.getTracks().forEach(t=>t.stop()); },"image/jpeg"); };
+    document.getElementById("modalSaveBtn").onclick = ()=>{ if(modalCapturedBlob) addPendingFile(modalCapturedBlob); closeCameraModal(); Swal.fire("Foto ditambahkan","","success"); };
+    document.getElementById("modalRetakeBtn").onclick = ()=>{ closeCameraModal(); setTimeout(openCameraModal,200); };
+    document.getElementById("modalCloseBtn").onclick = closeCameraModal;
+    function closeCameraModal(){ document.getElementById("cameraModal").classList.remove("active"); if(modalStream) modalStream.getTracks().forEach(t=>t.stop()); modalStream=null; document.getElementById("modalVideo").classList.remove("hidden"); document.getElementById("modalPreview").classList.add("hidden"); document.getElementById("modalCaptureBtn").classList.remove("hidden"); document.getElementById("modalRetakeBtn").classList.add("hidden"); document.getElementById("modalSaveBtn").classList.add("hidden"); }
+</script>
+</body>
+</html>
